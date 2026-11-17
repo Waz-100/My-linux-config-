@@ -1,0 +1,439 @@
+/* ==========================================================
+   Waybar - wallpaper-tinted glass islands (v10)
+   - colours come from colour.css, so the whole bar
+     re-tints itself when the wallpaper changes
+   - the wallpaper's colour is MIXED into the islands, borders, text
+     and pills, so a new wallpaper is obvious
+   - the right island (speaker, battery, hardware, wifi, clock) holds ONE
+     colour: the wallpaper's main hue, rich rather than pastel, with a
+     gentle light-to-deep shading so the pills keep their depth
+   - the text on the left island (now playing + window title) is NEON: the
+     wallpaper's main hue at full volume, with a soft glow
+   - needs these colours from colour.css: primary, on_primary,
+     primary_container, tertiary, surface, on_surface, on_surface_variant,
+     shadow, error, on_error, error_container, right_light, right_deep,
+     neon_1 (neon_2 only if you use it).
+     neon_1 / neon_2 / right_light / right_deep are written by wallpaper_palette.py
+   - every workspace is a dot; once it has windows it grows into
+     a chip showing their icons; the active one glows and pulses
+   - pill width: the SECOND number in each padding line
+     (e.g. "2px 7px") is the gap between text and border
+   ========================================================== */
+
+/* Safety net: if colour.css is missing this colour (the matugen template has to contain
+   the line  @define-color primary_container ...), the bar keeps working with this neutral
+   dark instead of losing its island fill. When colour.css does define it, the real value
+   wins, because it is read after this line. */
+@define-color primary_container #4a3a3a;
+
+/* The same safety net for the neon text colours. wallpaper_palette.py writes the real neon_1 and
+   neon_2 into colour.css (the wallpaper's main and second hue at full neon; a black and white
+   wallpaper gets cyan and magenta). These two lines only matter for a colour.css that does not
+   have them yet; the real ones win because they are read after these. */
+@define-color neon_1 #00fdfd;
+@define-color neon_2 #ff24f7;
+
+/* ... and for the right island's colour. wallpaper_palette.py writes right_light and right_deep
+   (two shades of the wallpaper's main colour). If your colour.css does not have them yet, the
+   right pills fall back to one flat @primary until the next wallpaper change writes the real ones. */
+@define-color right_light @primary;
+@define-color right_deep @primary;
+
+@import url("colour.css");
+
+/* ---------- the colours the whole bar is built from ----------
+   mix(A, B, 0.45) = 55% A + 45% B.
+   island_bg : the big container behind each group = dark surface + 45% of the wallpaper's
+               "container" colour. That colour is rich and saturated, unlike the pale accent
+               (primary), which is why the tint now reads as the wallpaper's colour instead
+               of a dull brown. Raise the 0.45 for a stronger tint (more red on a red
+               wallpaper), lower it for a subtler one. The 0.88 is how solid the island is.
+   pill_bg   : the pills inside it, darker than the island so they stand out. */
+@define-color island_bg alpha(mix(@surface, @primary_container, 0.45), 0.88);
+@define-color island_border alpha(@primary, 0.45);
+@define-color pill_bg alpha(mix(@surface, @primary_container, 0.20), 0.78);
+@define-color pill_border alpha(@primary, 0.35);
+@define-color pill_fg mix(@on_surface, @primary, 0.30);
+@define-color pill_hover alpha(@primary, 0.30);
+@define-color pill_accent @primary;
+@define-color pill_on_accent @on_primary;
+
+/* text colour of the left island: NEON. neon_1 is the wallpaper's main hue turned up as far
+   as the screen can show it (cyan on a black and white wallpaper), so it changes with every
+   wallpaper. Put @neon_2 on a line to use the wallpaper's second neon colour instead (try it on
+   the window title for a two-colour look), or @primary for the old soft colour. */
+@define-color left_text   @neon_1;     /* now playing */
+@define-color window_text @neon_1;     /* window title */
+
+/* the colour ramp for the right island's pills: ONE colour in two shades, light to deep.
+   They run left to right across the bar:
+   speaker (1 to 2), battery (2 to 3), hardware (3 to 4), wifi (4 to 5), clock (5 back to 1).
+   right_light / right_deep come from the wallpaper's main colour (wallpaper_palette.py).
+   For perfectly flat pills in a single colour, put @right_light on the rtone_5 line.
+   To change the ramp, change these five lines. */
+@define-color rtone_1 @right_light;
+@define-color rtone_2 mix(@rtone_1, @rtone_5, 0.25);
+@define-color rtone_3 mix(@rtone_1, @rtone_5, 0.50);
+@define-color rtone_4 mix(@rtone_1, @rtone_5, 0.75);
+@define-color rtone_5 @right_deep;
+
+/* the wallpaper's two-colour ramp, now only used by the active workspace chip in the centre */
+@define-color tone_1 @primary;
+@define-color tone_2 mix(@primary, @tertiary, 0.25);
+@define-color tone_3 mix(@primary, @tertiary, 0.50);
+@define-color tone_4 mix(@primary, @tertiary, 0.75);
+@define-color tone_5 @tertiary;
+
+/* text on the gradient pills (dark, so it reads on the light colours) */
+@define-color light_pill_fg @surface;
+
+/* border + glow on the light pills' hover. Brighter gold: #ffc83d */
+@define-color pill_gold #d4af37;
+
+* {
+    font-family: "JetBrainsMono Nerd Font", sans-serif;
+    font-size: 13px;
+    min-height: 0;
+}
+
+/* the bar itself stays see-through, so the gaps between the islands show the wallpaper */
+window#waybar {
+    background: transparent;
+}
+
+/* the three islands: left, centre and right group. Each one is a glass container:
+   tinted with the wallpaper colour, a soft light sheen across the top, and an accent border.
+   Change 18px to taste (bigger = rounder, 0px = square corners);
+   margin 6px = gap between islands. */
+.modules-left,
+.modules-center,
+.modules-right {
+    background-color: @island_bg;
+    background-image: linear-gradient(to bottom, alpha(@on_surface, 0.10), alpha(@on_surface, 0.0));
+    border: 1px solid @island_border;
+    border-radius: 18px;
+    padding: 0 5px;
+    margin: 2px 6px;
+    box-shadow: 0 0 8px alpha(@primary, 0.22);
+}
+
+/* ---------- shared pill style ---------- */
+#window,
+#workspaces,
+#pulseaudio,
+#battery,
+#network,
+#clock,
+#hardware,
+#custom-exit,
+#mpris {
+    background-color: @pill_bg;
+    background-image: linear-gradient(to bottom, alpha(@pill_fg, 0.10), alpha(@pill_fg, 0.0));
+    color: @pill_fg;
+    border: 1px solid @pill_border;
+    border-radius: 20px;
+    padding: 2px 7px;
+    margin: 4px 3px;
+    box-shadow: inset 0 1px 0 alpha(@pill_fg, 0.08), 0 2px 8px alpha(@shadow, 0.30);
+    transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* ---------- hover feedback: the neon lights up (brighter ring, bigger glow) ----------
+   The fill stays dark on purpose: the old light accent fill would wash the neon text out. */
+#mpris:hover {
+    border-color: @left_text;
+    box-shadow: inset 0 1px 0 alpha(@pill_fg, 0.08), 0 0 12px alpha(@left_text, 0.55);
+    text-shadow: 0 0 10px alpha(@left_text, 0.95);
+}
+
+/* ---------- gradient pills: speaker, battery, hardware, wifi ----------
+   Each one is a gradient between two steps of the right island's ramp above (one colour, light
+   to deep), with dark text and a soft glow in that same colour. To add or remove a pill from
+   this group, edit the lists.
+   Keep every gradient in the "to right" form with two colours: that is what lets the
+   hover change fade smoothly instead of snapping. */
+#pulseaudio,
+#battery,
+#hardware,
+#network {
+    color: @light_pill_fg;
+    font-weight: 600;
+    border-color: alpha(@on_surface, 0.35);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 10px alpha(@rtone_5, 0.35);
+    transition: all 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);   /* hover fade: raise for slower */
+}
+
+#pulseaudio {
+    background-color: @rtone_1;
+    background-image: linear-gradient(to right, @rtone_1, @rtone_2);
+}
+
+#battery {
+    background-color: @rtone_2;
+    background-image: linear-gradient(to right, @rtone_2, @rtone_3);
+}
+
+#hardware {
+    background-color: @rtone_3;
+    background-image: linear-gradient(to right, @rtone_3, @rtone_4);
+}
+
+#network {
+    background-color: @rtone_4;
+    background-image: linear-gradient(to right, @rtone_4, @rtone_5);
+}
+
+/* battery states: the whole pill changes colour, so you can read it at a glance.
+   Order matters here: charging is last so it wins when the battery is low AND charging. */
+#battery.warning {
+    background-color: #f9e2af;
+    background-image: linear-gradient(to right, #f9e2af, #f5c26b);
+}
+
+#battery.critical {
+    background-color: @error;
+    background-image: linear-gradient(to right, @error, mix(@error, @error_container, 0.5));
+}
+
+#battery.charging {
+    background-color: #46b17b;
+    background-image: linear-gradient(to right, #46b17b, #7fd8a6);
+}
+
+/* critical and not charging: a red glow pulses around the pill so you can't miss it */
+#battery.critical:not(.charging) {
+    animation: battery-critical 1s ease-in-out infinite alternate;
+}
+
+@keyframes battery-critical {
+    0%   { box-shadow: 0 0 4px alpha(@error, 0.40); }
+    100% { box-shadow: 0 0 16px alpha(@error, 0.95); }
+}
+
+/* hover: the pill fades to black with white text, a gold border and a soft gold glow */
+#pulseaudio:hover,
+#battery:hover,
+#network:hover,
+#hardware:hover {
+    background-color: #000000;
+    background-image: linear-gradient(to right, #000000, #000000);
+    color: #ffffff;
+    border-color: @pill_gold;
+    box-shadow: inset 0 1px 0 alpha(@pill_gold, 0.25), 0 0 12px alpha(@pill_gold, 0.50);
+}
+
+/* a pulsing critical battery stops pulsing while you hover it, so the hover look shows */
+#battery.critical:not(.charging):hover {
+    animation: none;
+}
+
+/* the stats inside the hardware pill follow it to white text on hover */
+#hardware:hover #disk,
+#hardware:hover #cpu,
+#hardware:hover #memory {
+    color: #ffffff;
+}
+
+/* ---------- workspaces ---------- */
+#workspaces {
+    padding: 0 4px;
+}
+
+/* a workspace WITH windows: a soft chip that hugs its icons */
+#workspaces button {
+    min-width: 8px;
+    min-height: 8px;
+    /* 4px more padding on the right than on the left, on purpose: the icons in this
+       font are drawn 4px wider than the box the text layout reserves for them, so
+       this evens it out and the icons sit dead centre in the chip */
+    padding: 0 12px 0 8px;
+    margin: 2px 2px;
+    border: none;
+    box-shadow: none;
+    text-shadow: none;
+    background-image: none;
+    background-color: alpha(@pill_fg, 0.14);
+    border-radius: 20px;
+    color: @pill_fg;
+    transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* icon size inside a chip. It has to be set on the label itself: the "*" rule
+   gives every element its own font size, so setting it on the button does nothing. */
+#workspaces button label {
+    font-size: 14px;
+}
+
+/* an EMPTY workspace: just a small dot.
+   Its label shrinks to nothing, and the 8px top/bottom margin makes the dot exactly
+   as tall as a chip, so it stays round and the bar never changes height when a
+   window opens or closes. */
+#workspaces button.empty {
+    padding: 0;
+    margin: 8px 4px;
+    background-color: alpha(@pill_fg, 0.40);
+}
+
+#workspaces button.empty label {
+    font-size: 0px;
+}
+
+#workspaces button:hover {
+    background-color: alpha(@pill_fg, 0.26);
+}
+
+#workspaces button.empty:hover {
+    background-color: alpha(@pill_fg, 0.65);
+}
+
+/* the workspace you are on: a gradient chip in the wallpaper colours that breathes.
+   To switch the pulse off, delete the "animation" line. */
+#workspaces button.active {
+    background-color: @tone_1;
+    background-image: linear-gradient(to right, @tone_1, @tone_2);
+    color: @pill_on_accent;
+    box-shadow: 0 0 10px alpha(@pill_accent, 0.55);
+    animation: workspace-glow 2.8s ease-in-out infinite;
+}
+
+@keyframes workspace-glow {
+    0%   { box-shadow: 0 0 5px alpha(@pill_accent, 0.30); }
+    50%  { box-shadow: 0 0 15px alpha(@pill_accent, 0.90); }
+    100% { box-shadow: 0 0 5px alpha(@pill_accent, 0.30); }
+}
+
+#workspaces button.empty.active {
+    min-width: 30px;
+}
+
+#workspaces button.urgent {
+    background-color: @error;
+    background-image: none;
+    color: @on_error;
+}
+
+/* ---------- window title ---------- */
+#window {
+    color: @window_text;
+    text-shadow: 0 0 6px alpha(@window_text, 0.55);   /* the neon glow: delete this line for flat neon text */
+    padding: 2px 10px;
+}
+
+#window.empty {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* ---------- clock: the end of the gradient ramp, wraps back to the first colour ---------- */
+#clock {
+    background-color: @rtone_5;
+    background-image: linear-gradient(to right, @rtone_5, @rtone_1);
+    color: @light_pill_fg;
+    border-color: alpha(@on_surface, 0.35);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 10px alpha(@rtone_5, 0.35);
+    font-weight: bold;
+}
+
+#clock:hover {
+    background-color: mix(@rtone_5, @on_surface, 0.35);
+    background-image: linear-gradient(to right, mix(@rtone_5, @on_surface, 0.35), mix(@rtone_1, @on_surface, 0.35));
+}
+
+/* (battery states live up with the gradient pills, above) */
+
+/* ---------- hardware stats: one pill, items inside are plain ---------- */
+#hardware {
+    padding: 2px 4px;
+}
+
+#disk,
+#cpu,
+#memory {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: @light_pill_fg;
+    padding: 0 3px;
+    margin: 0;
+    transition: color 0.35s ease;
+}
+
+/* ---------- power button ----------
+   Resting: a quiet glass pill with a wallpaper-coloured ring and icon, so it follows the
+   theme like everything else. Hover: it fades into a bright red gradient with a red glow
+   and the icon turns dark. The old hover used the dark red "error_container", which looked
+   muddy next to the bright pills; the bright "error" red reads much better.
+   Both gradients below are the same "to right" two-colour shape (one see-through, one solid)
+   so the fade is smooth. */
+#custom-exit {
+    padding: 0 10px;
+    font-size: 15px;
+    color: @pill_accent;
+    background-color: alpha(@pill_accent, 0.12);
+    background-image: linear-gradient(to right, alpha(@error, 0.0), rgba(255, 143, 163, 0.0));
+    border-color: alpha(@pill_accent, 0.60);
+    box-shadow: inset 0 1px 0 alpha(@pill_fg, 0.10), 0 0 8px alpha(@pill_accent, 0.25);
+    transition: all 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+#custom-exit:hover {
+    color: @on_error;
+    background-color: @error;
+    background-image: linear-gradient(to right, @error, rgba(255, 143, 163, 1.0));
+    border-color: @error;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 14px alpha(@error, 0.70);
+}
+
+/* ---------- now playing (optional: add "mpris" to modules-left) ---------- */
+#mpris {
+    color: @left_text;
+    text-shadow: 0 0 6px alpha(@left_text, 0.55);   /* the neon glow: delete this line for flat neon text */
+    padding: 2px 12px;
+}
+
+/* paused: the neon dims and the glow switches off */
+#mpris.paused {
+    color: alpha(@left_text, 0.6);
+    text-shadow: none;
+}
+
+/* ---------- tooltips (clock calendar, network info) ---------- */
+tooltip {
+    background-color: alpha(mix(@surface, @primary_container, 0.45), 0.97);
+    border: 1px solid @island_border;
+    border-radius: 12px;
+}
+
+tooltip label {
+    color: @pill_fg;
+}
+
+/* ---------- custom-visualizer: left exactly as it was ---------- */
+#custom-visualizer {
+    letter-spacing: 2px;
+    font-weight: 700;
+    animation: visualizer-colors 3s ease-in-out infinite;
+    background-color: rgba(30, 30, 46, 0.85);
+    border-radius: 16px;
+    padding: 0 12px;
+    margin: 4px 4px;
+    color: #cdd6f4;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    font-style: italic;
+
+
+}
+
+@keyframes visualizer-colors {
+    0%   { color: #ff0000; }
+    14%  { color: #ff8800; }
+    28%  { color: #ffee00; }
+    42%  { color: #33ff00; }
+    57%  { color: #00ffcc; }
+    71%  { color: #0088ff; }
+    85%  { color: #aa00ff; }
+    100% { color: #ff0000; }
+}
