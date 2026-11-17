@@ -1,0 +1,41 @@
+textures a persist
+
+# glyph-ghost pass 1: copy last frame's persist into a (every frame)
+startgroup
+    var int MODE = 0
+    output_texture a
+    shaders glyph-ghost
+endgroup
+
+# glyph-ghost pass 2: capture the screen into persist (every frame)
+startgroup
+    var int MODE = 1
+    output_texture persist
+    shaders glyph-ghost
+endgroup
+
+# Shake the typed letter for about 1.6s, then ease into solid
+startgroup
+    animation_start cursor-trail-move
+    animation_stop 1650
+    animation_curve ease-out
+    animation_step 16
+    shaders glyph-pop
+endgroup
+
+# glyph-ghost pass 3: draw the deleted letters floating away
+# animation_stop must stay a bit above LIFE (2.6s) in glyph-ghost.slang
+startgroup
+    var int MODE = 2
+    animation_start cursor-trail-move
+    animation_stop 2800
+    animation_step 16
+    shaders glyph-ghost
+endgroup
+
+# Blaze trail (final group, default output)
+startgroup
+    animation_start cursor-trail-move
+    animation_stop cursor-trail-stop
+    shaders cursor-trail-blaze
+endgroup
